@@ -1,0 +1,444 @@
+<!doctype html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<title>Document</title>
+		<style>
+		*{margin : 0px;}
+		/*전체 틀 스타일*/
+		.wrapper{
+			width :  1200px;
+			height : 800px;
+			background : yellow;
+			overflow : hidden;
+			margin : auto;
+		}
+		#stage{
+			width : 100%;
+			height : 80%;
+			background-image : url("./res/stagebg.jpg");
+			background-size : 100% 100%;
+			position : relative;
+		}
+		#control_area{
+			width : 100%;
+			height : 20%;
+			border-top : 2px solid #00ffff;
+		}
+		
+		/*control_area 내부 div 스타일*/
+		.left{
+			width : 140px;
+			height : 158px;
+			background-image : url("./res/leftframe7.jpg");
+			background-size : 100% 100%;
+			position : relative;
+			float : left;
+		}
+		#angle
+		{
+			width : 140px;
+			height : 140px;
+			position : relative;
+		}
+		#display_wind
+		{
+			width : 140px;
+			height : 20px;
+		}		
+		#wind_bar{
+			width : 50%;
+			height : 13px;
+			background : #00ffff;
+			position : absolute;
+			left : 25%;
+		}
+
+
+		/*center 내부 div 스타일*/
+		.center{
+			width : 900px;
+			height : 158px;
+			position : relative;
+			background-image : url("./res/frame2.jpg");
+			background-size: 100% 100%;
+
+			float : left;
+		}
+		.hp_box{
+			width : 80%;
+			height : 40px;
+			margin : auto;
+			background : gray;
+			margin-top : 45px;
+			border : 2px solid #990033;
+		}
+		.power_box{
+			width : 80%;
+			height : 40px;
+			margin : auto;
+			margin-top : 5px;
+			border : 2px solid #00ccff;
+		}
+		#power_bar{
+			width : 0%;
+			height : 100%;
+			background : dodgerblue;
+		}
+
+
+		/*right 내부 div 스타일*/
+		.right{
+			width : 160px;
+			height : 158px;
+			background-image : url("./res/rightframe1.jpg");
+			background-size : 100% 100%;
+			float : left;
+		}
+		#time{
+			width : 160px;
+			line-height : 150px;
+			font-size : 50px;
+			color : white;
+			text-align : center;
+			
+		}
+		</style>
+		<script src = "./Obj.js"></script>
+		<script src = "./Player.js"></script>
+		<script src = "./Land.js"></script>
+		<script src = "./common.js"></script>
+		<script src = "./Ball.js"></script>
+		<script src = "./Enemy.js"></script>
+		<script src = "./EnemyBase.js"></script>
+		<script src = "./ObjManager.js"></script>
+		<script src = "./Explosion.js"></script>
+		<script>
+		var stage;
+		var dir = true;
+		var player;
+		var alive;
+		var power_bar;
+		var hp_bar;
+		var b_deg = 0;
+		var num_p = 0;
+		var wnd_delay = 3000;
+		var wind_bar;
+		var wind_power;
+		var angle_div;
+		var objManager;
+		var res_time;
+		var explosionArr = [];
+		//연속발사 감지 flag
+		var fire_flag = true;
+		//그리기변수
+		var cnvs;
+		var ctx;
+		var r = 40;
+		
+		function createPlayer(){
+			alive = true;
+			player = new Player("PLAYER", stage, 50, 30, 100, 270, 0, 0, "./res/tank1.png");
+			objManager.addObject(player);
+		}
+		function createLand(){
+			var lands = new Land("LAND", stage, 1200, 80, 0, 560, 0, 0, "./res/earth.jpg");
+
+			objManager.addObject(lands);
+		}
+		function createTower(){
+			var tower = new Land("TOWER", stage, 150, 260, 0, 300, 0, 0, "./res/land.png");
+
+			objManager.addObject(tower);
+		}
+		function createEnemy(x){
+			if(x<8)
+			{
+				var enemy = new Enemy("ENEMY1", stage, 70, 40, 1100, 520, -0.3, 0, "./res/enemy1.png");
+				objManager.addObject(enemy);
+			}
+			else if(x>8)
+			{
+				var enemy = new Enemy("ENEMY2", stage, 40, 40, 1100, 520, -0.5, 0, "./res/enemy2.png");
+				objManager.addObject(enemy);
+			}
+		}
+		function createEnemyBase(){
+			var enemyBase = new EnemyBase("ENEMYBASE", stage, 150, 150, 1050, 450, 0, 0, "./res/enemy_base.png");
+			objManager.addObject(enemyBase);
+		}
+		function init(){
+			/*변수 초기화 부분*/
+			stage = document.getElementById("stage");
+			power_bar = document.getElementById("power_bar");
+			hp_bar = document.getElementById("hp_bar");
+			angle_div = document.getElementById("angle");
+			cnvs = document.getElementById("angle_can");
+			wind_bar = document.getElementById("wind_bar");
+			res_time = document.getElementById("time");
+			ctx = cnvs.getContext('2d');
+			explosionArr = [];
+			// 오브젝트 메니저
+			objManager = new ObjManager();
+
+			
+			/*초기 함수 호출 부분*/
+			createPlayer();
+			createLand();
+			createTower();
+			createEnemyBase();
+			draw_angle();
+			gameLoop();
+			explosionLoop();
+		}
+		
+		//대포 발사
+		function fire(){
+			if(alive){
+				if(fire_flag){
+					if(dir){
+						var fireX = parseInt(player.obj.style.left)+parseInt(player.obj.style.width);
+						var fireY = parseInt(player.obj.style.top);
+						
+						var ballPwr = num_p/8.0;
+						console.log(fireX, fireY);
+						var ball = new Ball("P_BALL", stage, 10, 10,fireX+1, fireY, Math.cos(b_deg)*ballPwr, Math.sin(-b_deg)*ballPwr, "./res/ball.png")
+
+						objManager.addObject(ball);
+					}
+					else{
+						var fireX = parseInt(player.obj.style.left);
+						var fireY = parseInt(player.obj.style.top);
+						
+						var ballPwr = num_p/8.0;
+						console.log(fireX, fireY);
+						var ball = new Ball("P_BALL", stage, 10, 10,fireX-11, fireY, -(Math.cos(b_deg)*ballPwr), Math.sin(-b_deg)*ballPwr, "./res/ball.png")
+
+						objManager.addObject(ball);
+					}
+				}
+				fire_flag = true;
+			}
+		}
+	
+		function boom(x, y, type){
+			var expX = x;
+			var expY = y;
+			var expType = type;
+			var explosion = new Explosion(stage, expX, expY, expType);
+			explosionArr.push(explosion);
+		}
+
+		function getPower(){
+			if(num_p <100){
+				num_p += 1;
+				power_bar.style.width = num_p+"%";
+			}
+			else{
+				if(fire_flag)
+				{
+					fire();
+					fire_flag = false;
+				}
+			}
+		}
+		function gameOver(x){
+			var win;
+			if(x){
+				stage.innerHTML = "<h1 style = 'color:white'>You Win </h1><br> <h4 style = 'color:white'>Press Enter</h4>";
+				stage.style.fontSize = 70+"px";
+				stage.style.textAlign = "center";
+			}
+			else{
+				stage.innerHTML = "<h1 style = 'color:red'>Game Over </h1><br> <h4 style = 'color:white'>Press Enter</h4>";
+				stage.style.fontSize = 70+"px";
+				stage.style.textAlign = "center";
+			}
+			addEventListener("keydown", function(){
+				var key  = event.keyCode;
+				switch(key){
+					case 13 : location.reload(); break;
+				}
+			});
+		}
+
+		function draw_angle(){
+		 	if(b_deg>=0 &&b_deg<3.14*1/2){
+				if(dir){
+					var angle_x = r*Math.cos(b_deg);
+					var angle_y = -r*Math.sin(b_deg);
+					
+					ctx.clearRect(0, 0, cnvs.width, cnvs.height);
+					ctx.beginPath();
+					ctx.strokeStyle = '#fff';
+					ctx.moveTo(70, 62);
+					ctx.lineTo(angle_x+70, angle_y+62);
+					ctx.stroke();
+					ctx.closePath();
+					}
+				else{
+					var angle_x = -r*Math.cos(b_deg);
+					var angle_y = -r*Math.sin(b_deg);
+					
+					ctx.clearRect(0, 0, cnvs.width, cnvs.height);
+					ctx.beginPath();
+					ctx.strokeStyle = '#fff';
+					ctx.moveTo(70, 62);
+					ctx.lineTo(angle_x+70, angle_y+62);
+					ctx.stroke();
+					ctx.closePath();
+				}
+				
+			}
+		}
+		function setDeg(isUp){
+			if(isUp)
+			{
+				if(b_deg<3.14*1/2)
+				{
+					b_deg+=0.05;
+				}
+				else
+				{
+					b_deg = 3.14*1/2;
+				}
+			}
+			else
+			{
+				if(b_deg>0)
+				{
+					b_deg-=0.05;
+				}
+				else
+				{
+					b_deg = 0;
+				}
+			}
+		}
+		function flip(){
+			if(dir){
+				player.img.src = "./res/tank1.png";
+				player.velX = 3;
+			}
+			else if(!dir){
+				player.img.src = "./res/tank2.png";
+				player.velX = -3;
+			}
+		}
+		function display_time(x)
+		{
+			var num = parseInt(x/100);
+			res_time.innerText = num;
+		}
+		//키 입력
+		function joystick(){	
+			var key = event.keyCode;
+			switch(key)
+			{
+				case 37 : dir = false; flip(); draw_angle();break;
+				case 39 : dir = true; flip(); draw_angle();break;
+				case 32 : getPower(); break;
+				case 38 :	setDeg(true); draw_angle(); break;
+				case 40 : setDeg(false); draw_angle(); break;
+			}
+		}
+		function stop(){
+			var key = event.keyCode;
+			switch(key)
+			{
+				case 37 : player.velX = 0; break;
+				case 39 : player.velX = 0; break;
+				case 32 : fire(); num_p = 0; break;
+				case 38 : break;
+				case 40 : break;
+			}
+		}
+		function wind()
+		{
+			if(wnd_delay >= 3000)
+			{
+				wind_power = getRandomByRange(-10, 11);
+				changeWind(wind_power);
+				wnd_delay = 0;
+			}
+			else{
+				wnd_delay++;
+			}
+			
+		}
+		function changeWind(wind){
+			if(wind>=0){
+				wind_bar.style.left = 50+"%";
+				wind_bar.style.width = wind*5+"%";
+			}
+			if(wind<0){
+				wind_bar.style.left = 50+(wind*5)+"%";
+				wind_bar.style.width = -(wind)*5+"%";
+			}
+		}
+		//적 공격
+		function enemy_attack(e){
+			var fireX = parseInt(e.obj.style.left);
+			var fireY = parseInt(e.obj.style.top);
+			var e_index = objManager.objectArray.indexOf(e);
+			console.log(fireX, fireY);
+			var e_ball = new Ball("E_BALL", stage, 10, 10,fireX-12, fireY, -5, -3, "./res/ball.png");
+			objManager.addObject(e_ball);
+		}
+		function explosionLoop()
+		{
+			if(alive){
+				for(var i = 0 ; i<explosionArr.length;i++)
+				{
+					explosionArr[i].tick();
+				}
+				setTimeout("explosionLoop()", 100);
+			}
+			else{
+				gameOver(false);
+			}
+		}
+		function gameLoop()
+		{
+			if(alive){
+				objManager.tick();
+				objManager.render();
+				wind();
+				setTimeout("gameLoop()", 10);
+			}
+		}
+		addEventListener("load", function(){
+			init();
+		});
+		</script>
+	</head>
+	<body onKeyDown = "joystick()" onKeyUp = "stop()">
+		<div class = "wrapper">
+			<div id = "stage">
+			</div>
+			<div id = "control_area">
+				<div class = "left">
+					<div id = "angle">
+						<canvas id = "angle_can" width = "140" height = "140"></canvas>
+					</div>
+					<div id = "display_wind">
+						<div id= "wind_bar">
+						</div>
+					</div>
+				</div>
+				<div class = "center">
+					<div class = "hp_box">
+						<div id = "hp_bar"></div>
+					</div>
+					<div class = "power_box">
+						<div id = "power_bar"></div>
+					</div>
+				</div>
+				<div class = "right">
+					<div id = "time">
+					</div>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>
